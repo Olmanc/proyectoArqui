@@ -1,0 +1,2 @@
+# proyectoArqui
+Proyecto - Simulador multicore
