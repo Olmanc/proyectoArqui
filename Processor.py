@@ -1,7 +1,7 @@
 import Nucleo, Memory, DataCache, InstCache, Directorio
 from Queue import Queue
 class Processor():
-    self.__init__(self, coreAmount, memSize, cacheSize):
+    def self.__init__(self, coreAmount, instMemSize, sharedMemSize, cacheSize):
         self.cores = [Nucleo() for i in range(coreAmount)]
         self.dataCaches = [DataCache(cacheSize) for i in range(coreAmount)]
         self.instCaches = [InstCache(cacheSize) for i in range(coreAmount)]
@@ -9,13 +9,13 @@ class Processor():
         self.instMemory = Memory(memSize)
         self.directory = Directorio()
         self.context = Queue()
-    self.run(self):
+    def self.run(self):
         #aqui se corren las weas lel
         pass
-    self.writeContext(self):
+    def self.writeContext(self):
         #escribir contextos
         pass
-    self.readContext(self):
+    def self.readContext(self):
         #leer contextos
         pass
     
