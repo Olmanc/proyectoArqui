@@ -4,7 +4,7 @@ class Nucleo:
     #currentStage: int
     def __init__(self):
         self.pc = 0
-        self.registers = [None]*32
+        self.registers = [0]*32 #mejor use 0's para no tener problemas con operadores
         self.currentStage = None
 
     def incPC(self):
