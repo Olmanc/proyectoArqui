@@ -1,11 +1,21 @@
-class Nucleo:
-    def __init__(self):
+from threading import Thread
+import random
+class Nucleo(Thread):
+    def __init__(self, name, id):
         self.pc = 0
         self.registers = [0]*32 #mejor use 0's para no tener problemas con operadores
         #self.currentStage = None
         self.instructionSet = {8: self.daddi, 32: self.dadd, 34: self.dsub,
                                12: self.dmul, 14: self.ddiv, 4: self.beqz,
                                5: self.bneqz, 3: self.jal, 2: self.jr, 35: self.lw, 43: self.sw, 63: self.end}
+        Thread.__init__(self)
+        self.name = name
+        self.id = id
+    def run(self):
+      print("Starting " + self.name + '\n')
+      self.execute()
+      
+
     def incPC(self):
         self.pc += 1
 
@@ -22,7 +32,15 @@ class Nucleo:
         pass
 
     def execute(self):
-        pass
+        inst = 0
+        while(inst != 63):
+            
+            inst = random.choice([8, 32, 34, 63])
+            sr = random.choice(list(range(32)))
+            tr = random.choice(list(range(32)))
+            dr = random.choice(list(range(1,32)))
+            print(repr(self.instructionSet[inst]) + '\n')
+            self.instructionSet[inst](sr, tr, dr)
 
     def _mem(self):
         pass
@@ -52,7 +70,7 @@ class Nucleo:
         if(sr == 0):
             self.pc += imm * 4    
     
-    def dneqz(self, sr, imm):
+    def bneqz(self, sr, imm):
         if not (sr == 0):
             self.pc += imm * 4   
 
@@ -71,6 +89,11 @@ class Nucleo:
         #calcular mem y buscar
         pass
     
-    def end():
-        #exit
-        pass
+    def end(self, sr, dr, imm):
+        print ("Exiting " + self.name + '\n')
+        return
+            
+        
+        
+
+
