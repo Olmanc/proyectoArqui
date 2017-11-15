@@ -1,21 +1,25 @@
-import Nucleo, Memory, DataCache, InstCache, Directorio
-from Queue import Queue
+from Nucleo import Nucleo
+from Memory import Memory
+from DataCache import DataCache
+from InstrCache import InstrCache
+from Directorio import Directorio
+from queue import Queue
 class Processor():
-    def self.__init__(self, coreAmount, instMemSize, sharedMemSize, cacheSize):
-        self.cores = [Nucleo() for i in range(coreAmount)]
+    def __init__(self, coreAmount, instMemSize, sharedMemSize, cacheSize):
+        self.cores = [Nucleo(i, ''+str(i)) for i in range(coreAmount)]
         self.dataCaches = [DataCache(cacheSize) for i in range(coreAmount)]
-        self.instCaches = [InstCache(cacheSize) for i in range(coreAmount)]
-        self.sharedMemory = Memory(memSize)
-        self.instMemory = Memory(memSize)
+        self.instCaches = [InstrCache(cacheSize) for i in range(coreAmount)]
+        self.sharedMemory = Memory(sharedMemSize)
+        self.instMemory = Memory(instMemSize)
         self.directory = Directorio()
         self.context = Queue()
-    def self.run(self):
+    def run(self):
         #aqui se corren las weas lel
         pass
-    def self.writeContext(self):
+    def writeContext(self):
         #escribir contextos
         pass
-    def self.readContext(self):
+    def readContext(self):
         #leer contextos
         pass
     
