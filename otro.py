@@ -10,9 +10,10 @@ def getHilos(dir, procesador):
     cont = 0
     for x in a:
         fo = open(x,"r")
+        print(x)
         for line in fo.readlines():
             c = line.split('\s')
-            d = c[0].split()
+            d = [int(t) for t in c[0].split()]
             if cont < l:
                 bloque = cont//4
                 palabra = cont%4
@@ -23,11 +24,13 @@ def getHilos(dir, procesador):
             cont += 1
 
 #prueba crear un procesador y  palabras de memoria de instrucciones metidas a memoria
-#b = Processor.Processor(1,24,16,4)
-#dir = input('directorio?:\n')
-#getHilos(dir,b)
-#l = (len(b.instMemory.memory)*4)
-#for i in range(l):
-#    bloq = i//4
-#    wrd = i%4
-#    print("bloque: ", bloq, " palabra: ", wrd, "valor:",b.instMemory.read2(bloq, wrd))
+b = Processor.Processor(1,24,16,4,0)
+dir = input('directorio?:\n')
+getHilos(dir,b)
+b.cores[0].instrCache.write(0, b.instMemory.read(0))
+b.cores[0].start()
+'''l = (len(b.instMemory.memory)*4)
+for i in range(l):
+    bloq = i//4
+    wrd = i%4
+    print("bloque: ", bloq, " palabra: ", wrd, "valor:",b.instMemory.read2(bloq, wrd))'''

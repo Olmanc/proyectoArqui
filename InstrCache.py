@@ -6,10 +6,10 @@ class InstrCache:
         memBlock = int(address / 16)
         word = int(address % 16 / 4)
         cacheBlock = memBlock % 4
-        self.cache[cacheBlock][word] = data
-    def write(self, address, inst):
+        return self.cache[cacheBlock].getWord(word)
+    def write(self, address, block):
         memBlock = int(address / 16)
         word = int(address % 16 / 4)
         cacheBlock = memBlock % 4
-        self.cache[cacheBlock][word] = inst
+        self.cache[cacheBlock] = block
     

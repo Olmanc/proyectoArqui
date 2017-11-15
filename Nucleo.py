@@ -1,7 +1,7 @@
 from threading import Thread
 import random
 class Nucleo(Thread):
-    def __init__(self, name, id):
+    def __init__(self, name, id, instrCache, dataCache, instMem, trapFlag):
         self.pc = 0
         self.registers = [0]*32 #mejor use 0's para no tener problemas con operadores
         #self.currentStage = None
@@ -11,13 +11,16 @@ class Nucleo(Thread):
         Thread.__init__(self)
         self.name = name
         self.id = id
+        self.instrCache = instrCache
+        self.dataCache = dataCache
+        self.instMemory = instMem
+        self.trapFlag = trapFlag
     def run(self):
       print("Starting " + self.name + '\n')
       self.execute()
       
-
     def incPC(self):
-        self.pc += 1
+        self.pc += 4
 
     def getPC(self):
         return self.pc
@@ -25,25 +28,31 @@ class Nucleo(Thread):
     #def getStage(self):
         #return self.currentStage
 
-    def _fetch(self):
-        pass
+    def __fetch(self):
+        print(self.instrCache.getInstruction(self.pc))
+        return self.instrCache.getInstruction(self.pc)
 
-    def _decode(self):
+    def __decode(self):
         pass
 
     def execute(self):
-        inst = 0
-        while(inst != 63):
-            
-            inst = random.choice([8, 32, 34, 63])
-            sr = random.choice(list(range(32)))
-            tr = random.choice(list(range(32)))
-            dr = random.choice(list(range(1,32)))
-            print(repr(self.instructionSet[inst]) + '\n')
-            self.instructionSet[inst](sr, tr, dr)
+        opCode = 0
+        while(opCode != 63):
+            inst = self.__fetch()
+            opCode = inst.getOpCode()
+            sr = inst.getRegSource()
+            tr = inst.getRegTOrImm()
+            dr = inst.getRegDest()
+            print(repr(self.instructionSet[opCode]) + '\n')
+            self.incPC()
+            self.instructionSet[opCode](sr, tr, dr)
+            self.__mem()
+            if(self.trapFlag):
+                print('{}\n'.format(self.registers))
+                input()
 
-    def _mem(self):
-        pass
+    def __mem(self):
+        self.instrCache.write(self.pc, self.instMemory.read(self.pc))
 
     def writeback(self):
         pass
@@ -66,15 +75,15 @@ class Nucleo(Thread):
     def ddiv(self, sr, tr, dr):
         self.registers[dr] = self.registers[sr] / self.registers[tr]
 
-    def beqz(self, sr, imm):
-        if(sr == 0):
+    def beqz(self, sr, tr, imm):
+        if(self.registers[sr] == 0):
             self.pc += imm * 4    
     
-    def bneqz(self, sr, imm):
-        if not (sr == 0):
+    def bneqz(self, sr, tr, imm):
+        if not (self.registers[sr] == 0):
             self.pc += imm * 4   
 
-    def jal(self, imm):
+    def jal(self, sr, tr, imm):
         self.registers[31] = self.pc
         self.pc += imm 
 
@@ -90,6 +99,7 @@ class Nucleo(Thread):
         pass
     
     def end(self, sr, dr, imm):
+        self.__mem()
         print ("Exiting " + self.name + '\n')
         return
             

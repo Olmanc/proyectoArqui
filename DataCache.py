@@ -13,4 +13,4 @@ class DataCache:
         for block in self.cache:
             if (block['tag'] == blockNum):
                 return True
-        return false
+        return False

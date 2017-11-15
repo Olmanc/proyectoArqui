@@ -3,10 +3,10 @@ class Intruccion:
     #RegDest: int
     #RegSource: int
     #RegToImm: int
-    def __init__(self, code, regSour1, regSour2, regDest):
+    def __init__(self, code, regSour1, regTOrImm, regDest):
         self.OpCode = code
-        self.RegSour1 = regSour1
-        self.RegSour2 = regSour2
+        self.RegSource = regSour1
+        self.RegTOrImm = regTOrImm
         self.RegDest = regDest
 
     def getOpCode(self):
@@ -19,4 +19,4 @@ class Intruccion:
         return self.RegSource
 
     def getRegTOrImm(self):
-        return self.RegToImm
+        return self.RegTOrImm
