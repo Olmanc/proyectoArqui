@@ -104,6 +104,7 @@ class Nucleo(Thread):
         self.pc = sr
 
     def lw(self, sr, dr, imm):
+        pass
         '''
         LW Rx, n(Ry)  =  Rx <-- M(n+Ry)
         lw 35 0 12 0        R0 = 0+R12
@@ -120,7 +121,7 @@ class Nucleo(Thread):
         self.registers[dr] = data
         print("dato:", self.registers[dr])'''
         #calcula bloque y palabra
-        addr = self.registers[sr]+imm
+        '''addr = self.registers[sr]+imm
         block = addr//16
         word = addr%4        
         #bloquear cache (try)
