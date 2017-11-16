@@ -104,8 +104,44 @@ class Nucleo(Thread):
         self.pc = sr
 
     def lw(self, sr, dr, imm):
-        #calcular mem y buscar
-        pass
+        '''
+        LW Rx, n(Ry)  =  Rx <-- M(n+Ry)
+        lw 35 0 12 0        R0 = 0+R12
+        lw 35 0 14 28       R0 = 28+R14
+        lw 35 0 15 364      R0 = 364+R15
+        '''
+        #calcular mem y buscar        
+        '''addr = self.registers[sr]+imm
+        block = addr//16
+        word = addr%4
+
+        readBlock = self.sharedMemory.read(self.registers[sr]+imm)
+        data = readBlock.block[word]
+        self.registers[dr] = data
+        print("dato:", self.registers[dr])'''
+        #calcula bloque y palabra
+        addr = self.registers[sr]+imm
+        block = addr//16
+        word = addr%4        
+        #bloquear cache (try)
+
+        #esta en cache?
+        hit = self.dataCache.findBlock(addr)
+        print(hit)
+        if hit:
+            #esta en cache
+            readBlock = self.sharedMemory.read(self.registers[sr]+imm-256)
+            registers[dr] = readBlock[word]
+        else:
+            #no esta en cache
+            #bloque victima
+            if self.dataCache.cache[word]['state'] == 'M':
+                pass
+                #escribe bloque victima a memoria 
+                
+            #bloquear directorio? (try)
+            
+            #U/C (trae de memoria) vs M (copia a memoria)'''
     
     def sw(self, sr, dr, imm):
         #calcular mem y buscar
