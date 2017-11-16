@@ -60,7 +60,6 @@ class Nucleo(Thread):
                 print('{}\n'.format(self.registers))
                 input()
         if(opCode == 63):
-            print('nunva')
             return True
         else:
             return False
@@ -101,7 +100,7 @@ class Nucleo(Thread):
         self.registers[31] = self.pc
         self.pc += imm 
 
-    def jr(self, sr):
+    def jr(self, sr, tr, imm):
         self.pc = sr
 
     def lw(self, sr, dr, imm):
@@ -114,7 +113,7 @@ class Nucleo(Thread):
     
     def end(self, sr, dr, imm):
         self.__mem()
-        print ("Exiting " + self.name + '\n')
+        print ("Finished thread " + self.name + '\n')
         return True
 
     def stop(self):

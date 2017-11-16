@@ -4,5 +4,8 @@ class OS:
 
     def getQuantum(self):
         return self.quantum
-
+    
+    def setQuantum(self, quantum):
+        self.quantum = quantum
+        
 opSystem = OS(5)
