@@ -14,11 +14,13 @@ class Processor():
     def run(self):
         #aqui se corren las weas lel
         pass
-    def writeContext(self):
-        #escribir contextos
-        pass
+    def writeContext(self, pc, idThread, registers = None, status = False):
+        if not (registers):
+            registers = [0] * 32
+        self.context.put({'id': idThread, 'pc': pc, 'registers': registers, "status": status})
+        
     def readContext(self):
-        #leer contextos
-        pass
+        return self.context.get()
+    
     
 

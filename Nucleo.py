@@ -1,7 +1,8 @@
 from threading import Thread
 import random
+import OS as OpSystem
 class Nucleo(Thread):
-    def __init__(self, name, id, instrCache, dataCache, instMem, trapFlag):
+    def __init__(self, name, idCore, instrCache, dataCache, instMem, trapFlag):
         self.pc = 0
         self.registers = [0]*32 #mejor use 0's para no tener problemas con operadores
         #self.currentStage = None
@@ -10,14 +11,16 @@ class Nucleo(Thread):
                                5: self.bneqz, 3: self.jal, 2: self.jr, 35: self.lw, 43: self.sw, 63: self.end}
         Thread.__init__(self)
         self.name = name
-        self.id = id
+        self.id = idCore
         self.instrCache = instrCache
         self.dataCache = dataCache
         self.instMemory = instMem
         self.trapFlag = trapFlag
+       
     def run(self):
+      
       print("Starting " + self.name + '\n')
-      self.execute()
+      #self.execute()
       
     def incPC(self):
         self.pc += 4
@@ -27,9 +30,11 @@ class Nucleo(Thread):
 
     #def getStage(self):
         #return self.currentStage
+    def setPC(self, pc):
+        self.pc  = pc
 
     def __fetch(self):
-        print(self.instrCache.getInstruction(self.pc))
+        #print(self.instrCache.getInstruction(self.pc))
         return self.instrCache.getInstruction(self.pc)
 
     def __decode(self):
@@ -37,19 +42,28 @@ class Nucleo(Thread):
 
     def execute(self):
         opCode = 0
-        while(opCode != 63):
+        cicles = 0
+        while(opCode != 63 and OpSystem.opSystem.getQuantum() > cicles):
             inst = self.__fetch()
+            #print('INST: {0}, coreId: {1}, pc:{2}'.format(inst, self.id, self.pc))
             opCode = inst.getOpCode()
             sr = inst.getRegSource()
             tr = inst.getRegTOrImm()
             dr = inst.getRegDest()
-            print(repr(self.instructionSet[opCode]) + '\n')
+            #print(repr(self.instructionSet[opCode]) + '\n')
             self.incPC()
+            cicles += 1
             self.instructionSet[opCode](sr, tr, dr)
             self.__mem()
             if(self.trapFlag):
+                print('INST: {0}, coreId: {1}, pc:{2}'.format(repr(self.instructionSet[opCode]), self.id, self.pc))
                 print('{}\n'.format(self.registers))
                 input()
+        if(opCode == 63):
+            print('nunva')
+            return True
+        else:
+            return False
 
     def __mem(self):
         self.instrCache.write(self.pc, self.instMemory.read(self.pc))
@@ -101,7 +115,10 @@ class Nucleo(Thread):
     def end(self, sr, dr, imm):
         self.__mem()
         print ("Exiting " + self.name + '\n')
-        return
+        return True
+
+    def stop(self):
+        self.isRunning = False
             
         
         
