@@ -1,6 +1,7 @@
 from threading import Thread
 import random
 import OS as OpSystem
+import Instruccion
 class Nucleo(Thread):
     def __init__(self, name, idCore, instrCache, dataCache, instMem, trapFlag):
         self.pc = 0
@@ -45,6 +46,8 @@ class Nucleo(Thread):
         cicles = 0
         while(opCode != 63 and OpSystem.opSystem.getQuantum() > cicles):
             inst = self.__fetch()
+            if type(inst) != type(Instruccion.Intruccion('63','0','0','0')):
+                break
             #print('INST: {0}, coreId: {1}, pc:{2}'.format(inst, self.id, self.pc))
             opCode = inst.getOpCode()
             sr = inst.getRegSource()
