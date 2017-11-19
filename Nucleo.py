@@ -113,7 +113,6 @@ class Nucleo(Thread):
         self.pc = sr
 
     def lw(self, sr, dr, imm):
-        pass
         '''
         LW Rx, n(Ry)  =  Rx <-- M(n+Ry)
         lw 35 0 12 0        R0 = 0+R12
@@ -187,8 +186,6 @@ class Nucleo(Thread):
                 continue #cambio de ciclo
         #'''
         pass
-
-
     def sw(self, sr, dr, imm):
         #calcular mem y buscar
         pass

@@ -30,13 +30,13 @@ def main():
     OS.opSystem.setQuantum(quantum)
     print(OS.opSystem.getQuantum())
     p1 = Processor.Processor(2, 24, 16, 4, 0)
-    p2 = Processor.Processor(1, 24, 16, 4, 0)
+    #p2 = Processor.Processor(1, 24, 16, 4, 0)
     dir1 = 'p4'
-    dir2 = 'p3'
+    #dir2 = 'p3'
     getHilos(dir1, p1)
-    getHilos(dir2, p2)
-    procs = [p1, p2]
-    #procs = [p1]
+    #getHilos(dir2, p2)
+    #procs = [p1, p2]
+    procs = [p1]
     for proc in procs:
         for core in proc.cores:
             core.start()
