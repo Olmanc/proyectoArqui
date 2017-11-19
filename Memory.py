@@ -4,6 +4,9 @@ class Memory():
         self.memory = [Bloque() for i in range(size)]
     def write(self, block, word, data):
         self.memory[block].setWord(word, data)
+    def writeBlock(self, block, addressInBytes):
+        blk = int(addressInBytes / 16)
+        self.memory[blk] = block
     def read(self, addressInBytes):
         return self.__findBlock(addressInBytes)
     def __findBlock(self, addressInBytes):

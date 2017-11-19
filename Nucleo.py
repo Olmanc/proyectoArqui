@@ -1,8 +1,9 @@
 from threading import Thread
 import random
 import OS as OpSystem
+import Instruccion
 class Nucleo(Thread):
-    def __init__(self, name, idCore, instrCache, dataCache, instMem, trapFlag):
+    def __init__(self, name, idCore, instrCache, dataCache, instMem, sharedMemory, trapFlag, directory, dirLock, cacheLock, busLock, start):
         self.pc = 0
         self.registers = [0]*32 #mejor use 0's para no tener problemas con operadores
         #self.currentStage = None
@@ -15,13 +16,19 @@ class Nucleo(Thread):
         self.instrCache = instrCache
         self.dataCache = dataCache
         self.instMemory = instMem
+        self.sharedMemory = sharedMemory
         self.trapFlag = trapFlag
-       
+        self.memStart = start
+        self.directory = directory
+        self.dirLock = dirLock
+        self.cacheLock = cacheLock
+        self.busLock = busLock
+
     def run(self):
-      
+
       print("Starting " + self.name + '\n')
       #self.execute()
-      
+
     def incPC(self):
         self.pc += 4
 
@@ -45,6 +52,8 @@ class Nucleo(Thread):
         cicles = 0
         while(opCode != 63 and OpSystem.opSystem.getQuantum() > cicles):
             inst = self.__fetch()
+            if type(inst) != type(Instruccion.Intruccion('63','0','0','0')):
+                break
             #print('INST: {0}, coreId: {1}, pc:{2}'.format(inst, self.id, self.pc))
             opCode = inst.getOpCode()
             sr = inst.getRegSource()
@@ -72,45 +81,118 @@ class Nucleo(Thread):
 
     def getRegisters(self):
         return self.registers
-    
+
     def daddi(self, sr, dr, imm):
         self.registers[dr] = self.registers[sr] + imm
 
     def dadd(self, sr, tr, dr):
         self.registers[dr] = self.registers[sr] + self.registers[tr]
-        
+
     def dsub(self, sr, tr, dr):
         self.registers[dr] = self.registers[sr] - self.registers[tr]
 
     def dmul(self, sr, tr, dr):
-        self.registers[dr] = self.registers[sr] * self.registers[tr]
+        self.registers[dr] = int(self.registers[sr] * self.registers[tr])
 
     def ddiv(self, sr, tr, dr):
-        self.registers[dr] = self.registers[sr] / self.registers[tr]
+        self.registers[dr] = int(self.registers[sr] / self.registers[tr])
 
     def beqz(self, sr, tr, imm):
         if(self.registers[sr] == 0):
-            self.pc += imm * 4    
-    
+            self.pc += imm * 4
+
     def bneqz(self, sr, tr, imm):
         if not (self.registers[sr] == 0):
-            self.pc += imm * 4   
+            self.pc += imm * 4
 
     def jal(self, sr, tr, imm):
         self.registers[31] = self.pc
-        self.pc += imm 
+        self.pc += imm
 
     def jr(self, sr, tr, imm):
         self.pc = sr
 
     def lw(self, sr, dr, imm):
-        #calcular mem y buscar
         pass
-    
+        '''
+        LW Rx, n(Ry)  =  Rx <-- M(n+Ry)
+        lw 35 0 12 0        R0 = 0+R12
+        lw 35 0 14 28       R0 = 28+R14
+        lw 35 0 15 364      R0 = 364+R15
+        '''
+        #calcular mem y buscar
+        '''addr = self.registers[sr]+imm
+        block = addr//16
+        word = addr%4
+        readBlock = self.sharedMemory.read(self.registers[sr]+imm)
+        data = readBlock.block[word]
+        self.registers[dr] = data
+        print("dato:", self.registers[dr])'''
+
+        #(sr, dr, imm)
+
+        addr = self.registers[sr]+imm-self.memStart
+        block = addr//16
+        word = addr % 4
+        finish = False
+        while not finish:
+            if self.cacheLock.acquire(False):
+                hit = self.dataCache.findBlock(addr)
+                if hit:
+                    rBlock = self.sharedMemory.memory.read(addr)
+                    self.registers[dr] = rBlock[word]
+                else:
+                    #miss, bloque victima
+                    victim = self.dataCache.cache[word]
+                    if victim['state'] == 'M':
+                        if self.busLock.acquire(False):
+                            #write to memory
+                            self.sharedMem.writeBlock(victim['block'],victim['tag'])
+                            self.busLock.release()
+                        else:
+                            self.cacheLock.release()
+                            continue #cambio de ciclo
+                    if self.dirLock.acquire(False):
+                        if self.directory.directory[word]['state'] == 'U' or 'C':
+                            if self.busLock.acquire(False):
+                                #self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)?
+                                self.busLock.release()
+                                self.directory.directory[word]['block'] = 'C'
+                                self.dirLock.release()
+                                self.registers[dr] = self.dataCache.cache[word]['block'].block[word]
+                                self.cacheLock.release()
+                                finish = True
+                            else:
+                                self.dirLock.release()
+                                self.cacheLock.release()
+                                continue #cambio de ciclo
+                        elif self.directory.directory[word]['state'] == 'M':
+                            if self.busLock.acquire():
+                                #write to memory
+                                #self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)?
+                                self.busLock.release()
+                                self.directory.directory[word]['block'] = 'C'
+                                self.dirLock.release()
+                                self.registers[dr] = self.dataCache.cache[word]['block'].block[word]
+                                self.cacheLock.release()
+                                finish = True
+                            else:
+                                self.dirLock.release()
+                                self.cacheLock.release()
+                                continue #cambio de ciclo
+                    else:
+                        self.cacheLock.release()
+                        continue #cambio de ciclo
+            else:
+                continue #cambio de ciclo
+        #'''
+        pass
+
+
     def sw(self, sr, dr, imm):
         #calcular mem y buscar
         pass
-    
+
     def end(self, sr, dr, imm):
         self.__mem()
         print ("Finished thread " + self.name + '\n')
@@ -118,8 +200,3 @@ class Nucleo(Thread):
 
     def stop(self):
         self.isRunning = False
-            
-        
-        
-
-

@@ -1,7 +1,7 @@
 class Bloque:
     #block: array
     def __init__(self):
-        self.block = [0]*4
+        self.block = [1]*4
 
     def getWord(self, position):
         return self.block[position]

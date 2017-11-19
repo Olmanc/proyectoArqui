@@ -22,7 +22,7 @@ def getHilos(dir, procesador):
                 procesador.instMemory.write(bloque,palabra,inst)
             else:
                 print("no se pudo guardar la instruccion", c)
-            cont += 1 
+            cont += 1
 #prueba crear un procesador y  palabras de memoria de instrucciones metidas a memoria
 
 def main():
@@ -31,18 +31,19 @@ def main():
     print(OS.opSystem.getQuantum())
     p1 = Processor.Processor(2, 24, 16, 4, 0)
     p2 = Processor.Processor(1, 24, 16, 4, 0)
-    dir1 = 'p0'
-    dir2 = 'p1'
+    dir1 = 'p4'
+    dir2 = 'p3'
     getHilos(dir1, p1)
     getHilos(dir2, p2)
     procs = [p1, p2]
+    #procs = [p1]
     for proc in procs:
         for core in proc.cores:
             core.start()
         total = 0
         finished = []
         while not (proc.context.empty()):
-            
+
             for core in proc.cores:
                 context = proc.readContext()
                 if (context['status'] and context not in finished):
@@ -74,7 +75,7 @@ for core in b.cores:
 total = 0
 finished = []
 while not (b.context.empty()):
-    
+
     for core in b.cores:
         context = b.readContext()
         if (context['status'] and context not in finished):
@@ -91,7 +92,7 @@ while not (b.context.empty()):
     if(total == b.context.qsize()):
         print (b.context.qsize())
         break
-        
+
 
 for core in b.cores:
     core.stop()
