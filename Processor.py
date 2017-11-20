@@ -6,18 +6,24 @@ from Directorio import Directorio
 from queue import Queue
 from threading import Lock
 class Processor():
-    def __init__(self, coreAmount, instMemSize, sharedMemSize, cacheSize, trapFlag):
+    def __init__(self, coreAmount, instMemSize, sharedMemSize, cacheSize, trapFlag, procId):
         self.sharedMemory = Memory(sharedMemSize)
         self.instMemory = Memory(instMemSize)
         self.directory = Directorio(cacheSize)
         self.dirLock = Lock()
         self.cacheLock = Lock()
         self.busLock = Lock()
-        self.cores = [Nucleo(i, str(i), InstrCache(cacheSize), DataCache(cacheSize), self.instMemory, self.sharedMemory, trapFlag, self.directory, self.dirLock, self.cacheLock, self.busLock, 512-(256*coreAmount)) for i in range(coreAmount)]
         self.context = Queue()
+        self.finished = []
+        self.id = procId
+        self.cores = [Nucleo(i, 'Thread {}'.format(i), InstrCache(cacheSize), DataCache(cacheSize), self.instMemory, self.sharedMemory, trapFlag, self.directory, self.dirLock, self.cacheLock, self.busLock, 512-(256*coreAmount), self) for i in range(coreAmount)]
     def run(self):
         #aqui se corren las weas lel
-        pass
+        for core in self.cores:
+            core.start()
+        for core in self.cores:
+            core.join()
+        
     def writeContext(self, pc, idThread, registers = None, status = False):
         if not (registers):
             registers = [0] * 32
@@ -25,3 +31,7 @@ class Processor():
 
     def readContext(self):
         return self.context.get()
+
+    def stop(self):
+        for core in self.cores:
+            core.stop()

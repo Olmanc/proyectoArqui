@@ -1,16 +1,18 @@
-from threading import Thread
+from threading import Thread, Barrier, BrokenBarrierError
 import random
 import OS as OpSystem
 import Instruccion
+import queue 
+barrier = Barrier(2, timeout=5)
 class Nucleo(Thread):
-    def __init__(self, name, idCore, instrCache, dataCache, instMem, sharedMemory, trapFlag, directory, dirLock, cacheLock, busLock, start):
+    def __init__(self, name, idCore, instrCache, dataCache, instMem, sharedMemory, trapFlag, directory, dirLock, cacheLock, busLock, start, parentProcessor):
         self.pc = 0
         self.registers = [0]*32 #mejor use 0's para no tener problemas con operadores
         #self.currentStage = None
         self.instructionSet = {8: self.daddi, 32: self.dadd, 34: self.dsub,
                                12: self.dmul, 14: self.ddiv, 4: self.beqz,
                                5: self.bneqz, 3: self.jal, 2: self.jr, 35: self.lw, 43: self.sw, 63: self.end}
-        Thread.__init__(self)
+        Thread.__init__(self, daemon=True)
         self.name = name
         self.id = idCore
         self.instrCache = instrCache
@@ -23,11 +25,15 @@ class Nucleo(Thread):
         self.dirLock = dirLock
         self.cacheLock = cacheLock
         self.busLock = busLock
+        self.parentProcessor = parentProcessor
+        self.currentContext = None
+
 
     def run(self):
-
       print("Starting " + self.name + '\n')
-      #self.execute()
+      self.isRunning = True
+      while(self.isRunning):
+        self.execute()
 
     def incPC(self):
         self.pc += 4
@@ -48,30 +54,30 @@ class Nucleo(Thread):
         pass
 
     def execute(self):
-        opCode = 0
-        cicles = 0
-        while(opCode != 63 and OpSystem.opSystem.getQuantum() > cicles):
-            inst = self.__fetch()
-            if type(inst) != type(Instruccion.Intruccion('63','0','0','0')):
-                break
-            #print('INST: {0}, coreId: {1}, pc:{2}'.format(inst, self.id, self.pc))
-            opCode = inst.getOpCode()
-            sr = inst.getRegSource()
-            tr = inst.getRegTOrImm()
-            dr = inst.getRegDest()
-            #print(repr(self.instructionSet[opCode]) + '\n')
-            self.incPC()
-            cicles += 1
-            self.instructionSet[opCode](sr, tr, dr)
-            self.__mem()
-            if(self.trapFlag):
-                print('INST: {0}, coreId: {1}, pc:{2}'.format(repr(self.instructionSet[opCode]), self.id, self.pc))
-                print('{}\n'.format(self.registers))
-                input()
-        if(opCode == 63):
-            return True
-        else:
-            return False
+        while(self.loadContext()):
+            opCode = 0
+            cicles = 0
+            while(OpSystem.opSystem.getQuantum() > cicles and not self.currentContext['status']):
+                inst = self.__fetch()
+                #if type(inst) != type(Instruccion.Intruccion('63','0','0','0')):
+                # break
+                #print('INST: {0}, coreId: {1}, pc:{2}'.format(inst, self.id, self.pc))
+                opCode = inst.getOpCode()
+                sr = inst.getRegSource()
+                tr = inst.getRegTOrImm()
+                dr = inst.getRegDest()
+                #print(repr(self.instructionSet[opCode]) + '\n')
+                self.incPC()
+                cicles += 1
+                self.instructionSet[opCode](sr, tr, dr)
+                self.__mem()
+                if(self.trapFlag):
+                    print('INST: {0}, coreId: {1}, pc:{2}'.format(repr(self.instructionSet[opCode]), self.id, self.pc))
+                    print('{}\n'.format(self.registers))
+                    input()
+                
+            if not (self.currentContext['status']):
+                self.parentProcessor.writeContext(self.getPC(), self.currentContext['id'], self.getRegisters(), False)
 
     def __mem(self):
         self.instrCache.write(self.pc, self.instMemory.read(self.pc))
@@ -110,7 +116,7 @@ class Nucleo(Thread):
         self.pc += imm
 
     def jr(self, sr, tr, imm):
-        self.pc = sr
+        self.pc = self.registers[sr]
 
     def lw(self, sr, dr, imm):
         '''
@@ -146,7 +152,7 @@ class Nucleo(Thread):
                     if victim['state'] == 'M':
                         if self.busLock.acquire(False):
                             #write to memory
-                            self.sharedMem.writeBlock(victim['block'],victim['tag'])
+                            self.sharedMemory.writeBlock(victim['block'],victim['tag'])
                             self.busLock.release()
                         else:
                             self.cacheLock.release()
@@ -190,10 +196,32 @@ class Nucleo(Thread):
         #calcular mem y buscar
         pass
 
+    def loadContext(self):
+
+        try:
+            self.currentContext = self.parentProcessor.context.get(True, 5)
+            self.instrCache.write(self.currentContext['pc'], self.parentProcessor.instMemory.read(self.currentContext['pc']))
+            self.pc = self.currentContext['pc']
+            self.registers = self.currentContext['registers']
+            return True
+        except queue.Empty:
+            return False
     def end(self, sr, dr, imm):
-        self.__mem()
-        print ("Finished thread " + self.name + '\n')
-        return True
+        print ("Finished thread " + self.currentContext['id'] + '\n')
+        self.currentContext['registers'] = self.getRegisters()
+        self.currentContext['pc'] = self.getPC()
+        self.currentContext['status'] = True
+        self.parentProcessor.finished.append(self.currentContext)
+        self.isRunning = False
 
     def stop(self):
+        #barrier.wait()
+        for context in self.parentProcessor.finished:
+            print(context)
+        print('fuga')
+        
         self.isRunning = False
+'''try:
+                    barrier.wait()
+                except BrokenBarrierError:
+                    pass'''

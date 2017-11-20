@@ -2,6 +2,8 @@ import glob
 import Instruccion
 import Processor
 import OS
+from threading import Barrier
+barrier = Barrier(2)
 
 #recibe nombre de la carpeta donde esta los hilos
 #y el procesador donde carga la instrucciones
@@ -29,26 +31,41 @@ def main():
     quantum = int(input("Digite el quantum: \n"))
     OS.opSystem.setQuantum(quantum)
     print(OS.opSystem.getQuantum())
-    p1 = Processor.Processor(2, 24, 16, 4, 0)
-    #p2 = Processor.Processor(1, 24, 16, 4, 0)
-    dir1 = 'p4'
-    #dir2 = 'p3'
+    p1 = Processor.Processor(2, 24, 16, 4, 0, 0)
+    p2 = Processor.Processor(1, 24, 16, 4, 0, 1)
+    dir1 = 'p3'
+    dir2 = 'p4'
     getHilos(dir1, p1)
-    #getHilos(dir2, p2)
-    #procs = [p1, p2]
-    procs = [p1]
+    getHilos(dir2, p2)
+    procs = [p1, p2]
+    cores = []
     for proc in procs:
+        for core in proc.cores:
+            cores.append(core)
+    print(cores)
+    for core in cores:
+        core.start()
+    for core in cores:
+        core.join()
+    
+    #pass
+    for proc in procs:
+        for context in proc.finished:
+            print(context)
+    #procs = [p1]
+    '''for proc in procs:
         for core in proc.cores:
             core.start()
         total = 0
         finished = []
+        expectedLen = proc.context.qsize()
         while not (proc.context.empty()):
 
             for core in proc.cores:
                 context = proc.readContext()
-                if (context['status'] and context not in finished):
+                if (context['status']):
                     total += 1
-                    proc.writeContext(context['pc'], context['id'], context['registers'], context['status'])
+                    #proc.writeContext(context['pc'], context['id'], context['registers'], context['status'])
                     finished.append(context)
                 else:
                     core.instrCache.write(context['pc'], proc.instMemory.read(context['pc']))
@@ -57,16 +74,17 @@ def main():
                     print('Context id: {0} with pc: {1} on thread: {2}'.format(context['id'], context['pc'], core.id))
                     status = core.execute()
                     proc.writeContext(core.getPC(), context['id'], core.getRegisters(), status)
-            if(total == proc.context.qsize()):
+            if(total == expectedLen):
                 print (proc.context.qsize())
                 break
     for core in proc.cores:
-        core.stop()
+        core.stop()'''
 
-    while not (proc.context.empty()):
-        context = proc.readContext()
-        print ('Context id: {0} with pc: {1} and registers: {2}'.format(context['id'], context['pc'], context['registers']))
-
+    #while not (proc.context.empty()):
+        #context = proc.readContext()
+        #print ('Context id: {0} with pc: {1} and registers: {2}'.format(context['id'], context['pc'], context['registers']))
+    #for context in finished:
+        #print ('Context id: {0} with pc: {1} and registers: {2}'.format(context['id'], context['pc'], context['registers']))
 '''b = Processor.Processor(2, 24, 16, 4, 0)
 dir = input('directorio?:\n')
 getHilos(dir,b)
