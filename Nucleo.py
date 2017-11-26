@@ -8,7 +8,6 @@ class Nucleo(Thread):
     def __init__(self, name, idCore, instrCache, dataCache, instMem, sharedMemory, trapFlag, directory, dirLock, cacheLock, busLock, start, parentProcessor, sendQ):
         self.pc = 0
         self.registers = [0]*32 #mejor use 0's para no tener problemas con operadores
-        #self.currentStage = None
         self.instructionSet = {8: self.daddi, 32: self.dadd, 34: self.dsub,
                                12: self.dmul, 14: self.ddiv, 4: self.beqz,
                                5: self.bneqz, 3: self.jal, 2: self.jr, 35: self.lw, 43: self.sw, 63: self.end}
@@ -31,10 +30,10 @@ class Nucleo(Thread):
         self.sendQueue = sendQ
 
     def run(self):
-      print("Starting " + self.name + '\n')
-      self.isRunning = True
-      while(self.isRunning):
-        self.execute()
+        print("Starting " + self.name + '\n')
+        self.isRunning = True
+        while(self.isRunning):
+            self.execute()
 
     def incPC(self):
         self.pc += 4
@@ -42,8 +41,6 @@ class Nucleo(Thread):
     def getPC(self):
         return self.pc
 
-    #def getStage(self):
-        #return self.currentStage
     def setPC(self, pc):
         self.pc  = pc
 
@@ -60,11 +57,10 @@ class Nucleo(Thread):
             self.cicles = 0
             self.startTime = time.time()
             while(OpSystem.opSystem.getQuantum() > self.cicles and not self.currentContext['status']):
-                inst = self.__fetch()
-                #if type(inst) != type(Instruccion.Intruccion('63','0','0','0')):
-                # break
+                inst = self.__fetch()                
                 #print('INST: {0}, coreId: {1}, pc:{2}'.format(inst, self.id, self.pc))
                 opCode = inst.getOpCode()
+                #print(opCode)                
                 sr = inst.getRegSource()
                 tr = inst.getRegTOrImm()
                 dr = inst.getRegDest()
@@ -123,36 +119,25 @@ class Nucleo(Thread):
         self.pc = self.registers[sr]
 
     def lw(self, sr, dr, imm):
-        '''
-        LW Rx, n(Ry)  =  Rx <-- M(n+Ry)
-        lw 35 0 12 0        R0 = 0+R12
-        lw 35 0 14 28       R0 = 28+R14
-        lw 35 0 15 364      R0 = 364+R15
-        '''
-        #calcular mem y buscar
-        '''addr = self.registers[sr]+imm
-        block = addr//16
-        word = addr%4
-        readBlock = self.sharedMemory.read(self.registers[sr]+imm)
-        data = readBlock.block[word]
-        self.registers[dr] = data
-        print("dato:", self.registers[dr])'''
-
-        #(sr, dr, imm)
-
+                
         addr = self.registers[sr]+imm-self.memStart
-        block = addr//16
+        #print('ADDR: ',self.registers[sr]+imm, ' en ', self.name, self.id)
+        #print(addr)
+        block = (addr//16)%16
+        #word = (addr-(block*16))//4
         word = addr % 4
+        #print('Load addr {0} block {1} word {2}'.format(addr, block, word))
         finish = False
         while not finish:
             if self.cacheLock.acquire(False):
                 hit = self.dataCache.findBlock(addr)
-                if hit:
-                    rBlock = self.sharedMemory.memory.read(addr)
-                    self.registers[dr] = rBlock[word]
+                if hit: #esta en cache C o M
+                    rBlock = self.sharedMemory.read(addr)
+                    self.registers[dr] = rBlock.block[word]
+                    finish = True
+                    self.cacheLock.release()
                 else:
-                    #miss, bloque victima
-                    
+                    #miss, bloque victima                    
                     if self.dirLock.acquire(False):
                         self.cicles += 1
                         victim = self.dataCache.cache[word]
@@ -160,15 +145,22 @@ class Nucleo(Thread):
                             if self.busLock.acquire(False):
                                 #write to memory
                                 self.sharedMemory.writeBlock(victim['block'],victim['tag'])
+                                self.directory.directory[victim['tag']]['state'] = 'U'
+                                self.directory.directory[victim['tag']]['flags'][self.id] = True
+                                self.dataCache.cache[word]['state'] = 'I'                              
                                 self.busLock.release()
                             else:
                                 self.cacheLock.release()
                                 continue #cambio de ciclo
                         if self.directory.directory[word]['state'] == 'U' or 'C':
-                            if self.busLock.acquire(False):
-                                #self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)?
+                            if self.busLock.acquire(False):                                
+                                self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)                                
                                 self.busLock.release()
-                                self.directory.directory[word]['block'] = 'C'
+                                print(block)
+                                self.directory.directory[block]['state'] = 'C'
+                                self.directory.directory[block]['flags'][int(self.name)] = True
+                                self.dataCache.cache[word]['state'] = 'C'
+                                self.dataCache.cache[word]['tag'] = int(block)
                                 self.dirLock.release()
                                 self.registers[dr] = self.dataCache.cache[word]['block'].block[word]
                                 self.cacheLock.release()
@@ -178,12 +170,14 @@ class Nucleo(Thread):
                                 self.dirLock.release()
                                 self.cacheLock.release()
                                 continue #cambio de ciclo
-                        elif self.directory.directory[word]['state'] == 'M':
+                        elif self.directory.directory[block]['state'] == 'M':
                             if self.busLock.acquire():
                                 #write to memory
-                                #self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)?
+                                self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)
                                 self.busLock.release()
-                                self.directory.directory[word]['block'] = 'C'
+                                self.directory.directory[block]['state'] = 'C'
+                                self.directory.directory[block]['flags'][int(self.name)] = True
+                                self.dataCache.cache[word]['state'] = 'C'
                                 self.dirLock.release()
                                 self.registers[dr] = self.dataCache.cache[word]['block'].block[word]
                                 self.cacheLock.release()
@@ -204,7 +198,63 @@ class Nucleo(Thread):
         
     def sw(self, sr, dr, imm):
         #calcular mem y buscar
-        pass
+        addr = self.registers[sr]+imm-self.memStart
+        block = addr//16
+        word = (addr-(block*16))//4
+        finish = False
+        '''
+        SW Rx, n(Ry)  =  Rx <-- M(n+Ry)
+        SW 43 16 2 0        M[R16] = 2
+        SW 43 16 2 4        M[R16] = 2
+        SW 43 16 2 8        M[R16] = 2
+
+        self.dirLock = dirLock
+        self.cacheLock = cacheLock
+        self.busLock = busLock
+        '''
+        #while not finish:
+        #    if self.cacheLock.acquire(False):
+        #        hit = self.dataCache.findBlock(addr)
+        #        if hit: #esta en cache
+        #            finish = True                    
+                    # si es M
+        #            print(self.dataCache.cache)
+        #            continue
+                    #if self.dataCache.cache[word]
+                    #else si es C
+                        #bloquear directorio
+                        #invalidar en otras caches (bloquear cache remota? o usar cola?)
+                        #escribir en cache local
+                        #marcar como M en cache Y directorio
+                        #actualiza cache y directorio
+                        #desbloquear candados
+                #else: no esta en cache (miss)
+                    #bloquear directorio
+                    #bloque victima (copira a memoria)
+                    #invalidar y actualizar directorio
+                    #si es U
+                        #bloquear bus
+                        #cargar de memoria
+                        #cargar en cache
+                        #escribe en cache
+                        #marcar como M
+                        #desbloquear candados
+                    #else si es M****
+                        #donde esta el bloque?
+                        #copiar a memoria
+                        #copiar a cache
+                        #escribe en cache
+                        #(se mantiene M)
+                        #desbloquear canados
+                    #else si es C
+                        #invalidar en otras caches
+                        #traer de memoria
+                        #carga en cache
+                        #escribe en cache
+                        #marca como M
+                        #desbloquear canados
+        #    else:
+        #        finish = True 
 
     def loadContext(self):
 
@@ -233,7 +283,6 @@ class Nucleo(Thread):
             print(context)
         print('fuga')
         
-        self.isRunning = False
 '''try:
                     barrier.wait()
                 except BrokenBarrierError:

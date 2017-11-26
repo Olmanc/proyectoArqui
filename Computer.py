@@ -3,7 +3,6 @@ import Instruccion
 import Processor
 import OS
 from threading import Barrier
-from queue import Queue
 barrier = Barrier(2)
 
 #recibe nombre de la carpeta donde esta los hilos
@@ -31,11 +30,9 @@ def getHilos(dir, procesador):
 def main():
     quantum = int(input("Digite el quantum: \n"))
     OS.opSystem.setQuantum(quantum)
-    print(OS.opSystem.getQuantum())
-    queue12 = Queue()   #para mandar del procesador 1 al 2
-    queue21 = Queue()   #para mandar del procesador 2 al 1
-    p1 = Processor.Processor(2, 24, 16, 4, 0, 0, queue12, queue21)
-    p2 = Processor.Processor(1, 24, 16, 4, 0, 1, queue21, queue12)
+    #print(OS.opSystem.getQuantum())
+    p1 = Processor.Processor(2, 24, 16, 4, 0, 0)
+    p2 = Processor.Processor(1, 24, 16, 4, 0, 1)
     dir1 = 'p3'
     dir2 = 'p4'
     getHilos(dir1, p1)
@@ -45,11 +42,16 @@ def main():
     for proc in procs:
         for core in proc.cores:
             cores.append(core)
-    print(cores)
     for core in cores:
         core.start()
     for core in cores:
         core.join()
+    #for p in procs:
+    #    for d in p.directory.directory:
+    #        print(d)
+    #for core in cores:
+    #    for c in core.dataCache.cache:
+    #        print(c)
     print('Gathering contexts for printing...')
     print('Formatting registers for output...')
     print('Done!\n')
@@ -59,8 +61,9 @@ def main():
             registers = context['registers']
             ppRegisters = {}
             for i in range(len(registers)):
-                ppRegisters['R{}'.format(i)] = registers[i]
-            print('Thread ID: {0}, finalPC: {1}, registers: {2}, totalCicles: {3}, totalTime: {4}\n'
+                if registers[i] != 0:
+                    ppRegisters['R{}'.format(i)] = registers[i]
+            print('Thread ID: {0}\n finalPC: {1}\n registers: {2}\n totalCicles: {3}\n totalTime: {4}\n'
                     .format(context['id'], context['pc'], ppRegisters, context['cicles'], context['elapsedTime']))
 
 
