@@ -24,10 +24,10 @@ class Processor():
         for core in self.cores:
             core.join()
         
-    def writeContext(self, pc, idThread, registers = None, status = False):
+    def writeContext(self, pc, idThread, registers = None, status = False, cicles = 0, elapsedTime = 0):
         if not (registers):
             registers = [0] * 32
-        self.context.put({'id': idThread, 'pc': pc, 'registers': registers, "status": status})
+        self.context.put({'id': idThread, 'pc': pc, 'registers': registers, "status": status, 'cicles': cicles, 'elapsedTime': elapsedTime})
 
     def readContext(self):
         return self.context.get()

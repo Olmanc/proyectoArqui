@@ -47,84 +47,18 @@ def main():
         core.start()
     for core in cores:
         core.join()
-    
-    #pass
+    print('Gathering contexts for printing...')
+    print('Formatting registers for output...')
+    print('Done!\n')
     for proc in procs:
         for context in proc.finished:
-            print(context)
-    #procs = [p1]
-    '''for proc in procs:
-        for core in proc.cores:
-            core.start()
-        total = 0
-        finished = []
-        expectedLen = proc.context.qsize()
-        while not (proc.context.empty()):
+            
+            registers = context['registers']
+            ppRegisters = {}
+            for i in range(len(registers)):
+                ppRegisters['R{}'.format(i)] = registers[i]
+            print('Thread ID: {0}, finalPC: {1}, registers: {2}, totalCicles: {3}, totalTime: {4}\n'
+                    .format(context['id'], context['pc'], ppRegisters, context['cicles'], context['elapsedTime']))
 
-            for core in proc.cores:
-                context = proc.readContext()
-                if (context['status']):
-                    total += 1
-                    #proc.writeContext(context['pc'], context['id'], context['registers'], context['status'])
-                    finished.append(context)
-                else:
-                    core.instrCache.write(context['pc'], proc.instMemory.read(context['pc']))
-                    core.registers = context['registers']
-                    core.setPC(context['pc'])
-                    print('Context id: {0} with pc: {1} on thread: {2}'.format(context['id'], context['pc'], core.id))
-                    status = core.execute()
-                    proc.writeContext(core.getPC(), context['id'], core.getRegisters(), status)
-            if(total == expectedLen):
-                print (proc.context.qsize())
-                break
-    for core in proc.cores:
-        core.stop()'''
-
-    #while not (proc.context.empty()):
-        #context = proc.readContext()
-        #print ('Context id: {0} with pc: {1} and registers: {2}'.format(context['id'], context['pc'], context['registers']))
-    #for context in finished:
-        #print ('Context id: {0} with pc: {1} and registers: {2}'.format(context['id'], context['pc'], context['registers']))
-'''b = Processor.Processor(2, 24, 16, 4, 0)
-dir = input('directorio?:\n')
-getHilos(dir,b)
-for core in b.cores:
-    core.start()
-total = 0
-finished = []
-while not (b.context.empty()):
-
-    for core in b.cores:
-        context = b.readContext()
-        if (context['status'] and context not in finished):
-            total += 1
-            b.writeContext(context['pc'], context['id'], context['registers'], context['status'])
-            finished.append(context)
-        else:
-            core.instrCache.write(context['pc'], b.instMemory.read(context['pc']))
-            core.registers = context['registers']
-            core.setPC(context['pc'])
-            print('Context id: {0} with pc: {1} on thread: {2}'.format(context['id'], context['pc'], core.id))
-            status = core.execute()
-            b.writeContext(core.getPC(), context['id'], core.getRegisters(), status)
-    if(total == b.context.qsize()):
-        print (b.context.qsize())
-        break
-
-
-for core in b.cores:
-    core.stop()
-
-while not (b.context.empty()):
-    context = b.readContext()
-    print ('Context id: {0} with pc: {1} and registers: {2}'.format(context['id'], context['pc'], context['registers']))
-'''
-'''#b.cores[0].instrCache.write(0, b.instMemory.read(0))
-#b.cores[0].start()
-l = (len(b.instMemory.memory)*4)
-for i in range(l):
-    bloq = i//4
-    wrd = i%4
-    print("bloque: ", bloq, " palabra: ", wrd, "valor:",b.instMemory.read2(bloq, wrd))'''
 
 main()

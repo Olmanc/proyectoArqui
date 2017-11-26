@@ -3,7 +3,7 @@ import random
 import OS as OpSystem
 import Instruccion
 import queue 
-barrier = Barrier(2, timeout=5)
+import time
 class Nucleo(Thread):
     def __init__(self, name, idCore, instrCache, dataCache, instMem, sharedMemory, trapFlag, directory, dirLock, cacheLock, busLock, start, parentProcessor):
         self.pc = 0
@@ -27,6 +27,7 @@ class Nucleo(Thread):
         self.busLock = busLock
         self.parentProcessor = parentProcessor
         self.currentContext = None
+        self.cicles = 0
 
 
     def run(self):
@@ -56,8 +57,9 @@ class Nucleo(Thread):
     def execute(self):
         while(self.loadContext()):
             opCode = 0
-            cicles = 0
-            while(OpSystem.opSystem.getQuantum() > cicles and not self.currentContext['status']):
+            self.cicles = 0
+            self.startTime = time.time()
+            while(OpSystem.opSystem.getQuantum() > self.cicles and not self.currentContext['status']):
                 inst = self.__fetch()
                 #if type(inst) != type(Instruccion.Intruccion('63','0','0','0')):
                 # break
@@ -68,16 +70,18 @@ class Nucleo(Thread):
                 dr = inst.getRegDest()
                 #print(repr(self.instructionSet[opCode]) + '\n')
                 self.incPC()
-                cicles += 1
-                self.instructionSet[opCode](sr, tr, dr)
-                self.__mem()
+                self.cicles += 1
                 if(self.trapFlag):
                     print('INST: {0}, coreId: {1}, pc:{2}'.format(repr(self.instructionSet[opCode]), self.id, self.pc))
                     print('{}\n'.format(self.registers))
                     input()
+                self.instructionSet[opCode](sr, tr, dr)
+                self.__mem()
+                
+            finishTime = time.time() - self.startTime
                 
             if not (self.currentContext['status']):
-                self.parentProcessor.writeContext(self.getPC(), self.currentContext['id'], self.getRegisters(), False)
+                self.parentProcessor.writeContext(self.getPC(), self.currentContext['id'], self.getRegisters(), False, self.cicles + self.currentContext['cicles'], finishTime + self.currentContext['elapsedTime'])
 
     def __mem(self):
         self.instrCache.write(self.pc, self.instMemory.read(self.pc))
@@ -148,16 +152,18 @@ class Nucleo(Thread):
                     self.registers[dr] = rBlock[word]
                 else:
                     #miss, bloque victima
-                    victim = self.dataCache.cache[word]
-                    if victim['state'] == 'M':
-                        if self.busLock.acquire(False):
-                            #write to memory
-                            self.sharedMemory.writeBlock(victim['block'],victim['tag'])
-                            self.busLock.release()
-                        else:
-                            self.cacheLock.release()
-                            continue #cambio de ciclo
+                    
                     if self.dirLock.acquire(False):
+                        self.cicles += 1
+                        victim = self.dataCache.cache[word]
+                        if victim['state'] == 'M':
+                            if self.busLock.acquire(False):
+                                #write to memory
+                                self.sharedMemory.writeBlock(victim['block'],victim['tag'])
+                                self.busLock.release()
+                            else:
+                                self.cacheLock.release()
+                                continue #cambio de ciclo
                         if self.directory.directory[word]['state'] == 'U' or 'C':
                             if self.busLock.acquire(False):
                                 #self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)?
@@ -166,6 +172,7 @@ class Nucleo(Thread):
                                 self.dirLock.release()
                                 self.registers[dr] = self.dataCache.cache[word]['block'].block[word]
                                 self.cacheLock.release()
+                                self.cicles += 16
                                 finish = True
                             else:
                                 self.dirLock.release()
@@ -184,14 +191,17 @@ class Nucleo(Thread):
                             else:
                                 self.dirLock.release()
                                 self.cacheLock.release()
+                                self.cicles += 1
                                 continue #cambio de ciclo
                     else:
                         self.cacheLock.release()
+                        self.cicles += 1
                         continue #cambio de ciclo
             else:
+                self.cicles += 1
                 continue #cambio de ciclo
         #'''
-        pass
+        
     def sw(self, sr, dr, imm):
         #calcular mem y buscar
         pass
@@ -208,9 +218,12 @@ class Nucleo(Thread):
             return False
     def end(self, sr, dr, imm):
         print ("Finished thread " + self.currentContext['id'] + '\n')
+        finishTime = time.time() - self.startTime
         self.currentContext['registers'] = self.getRegisters()
         self.currentContext['pc'] = self.getPC()
         self.currentContext['status'] = True
+        self.currentContext['cicles'] += self.cicles
+        self.currentContext['elapsedTime'] += finishTime
         self.parentProcessor.finished.append(self.currentContext)
         self.isRunning = False
 
