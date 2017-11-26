@@ -5,7 +5,7 @@ import Instruccion
 import queue 
 import time
 class Nucleo(Thread):
-    def __init__(self, name, idCore, instrCache, dataCache, instMem, sharedMemory, trapFlag, directory, dirLock, cacheLock, busLock, start, parentProcessor):
+    def __init__(self, name, idCore, instrCache, dataCache, instMem, sharedMemory, trapFlag, directory, dirLock, cacheLock, busLock, start, parentProcessor, sendQ):
         self.pc = 0
         self.registers = [0]*32 #mejor use 0's para no tener problemas con operadores
         #self.currentStage = None
@@ -28,7 +28,7 @@ class Nucleo(Thread):
         self.parentProcessor = parentProcessor
         self.currentContext = None
         self.cicles = 0
-
+        self.sendQueue = sendQ
 
     def run(self):
       print("Starting " + self.name + '\n')

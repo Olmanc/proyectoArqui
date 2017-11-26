@@ -3,6 +3,7 @@ import Instruccion
 import Processor
 import OS
 from threading import Barrier
+from queue import Queue
 barrier = Barrier(2)
 
 #recibe nombre de la carpeta donde esta los hilos
@@ -31,8 +32,10 @@ def main():
     quantum = int(input("Digite el quantum: \n"))
     OS.opSystem.setQuantum(quantum)
     print(OS.opSystem.getQuantum())
-    p1 = Processor.Processor(2, 24, 16, 4, 0, 0)
-    p2 = Processor.Processor(1, 24, 16, 4, 0, 1)
+    queue12 = Queue()   #para mandar del procesador 1 al 2
+    queue21 = Queue()   #para mandar del procesador 2 al 1
+    p1 = Processor.Processor(2, 24, 16, 4, 0, 0, queue12, queue21)
+    p2 = Processor.Processor(1, 24, 16, 4, 0, 1, queue21, queue12)
     dir1 = 'p3'
     dir2 = 'p4'
     getHilos(dir1, p1)
