@@ -4,9 +4,10 @@ from DataCache import DataCache
 from InstrCache import InstrCache
 from Directorio import Directorio
 from queue import Queue
-from threading import Lock
-class Processor():
-    def __init__(self, coreAmount, instMemSize, sharedMemSize, cacheSize, trapFlag, procId):
+from threading import Lock, Thread
+class Processor(Thread):
+    def __init__(self, coreAmount, instMemSize, sharedMemSize, cacheSize, trapFlag, procId, sendQ, receiveQ):
+        Thread.__init__(self)
         self.sharedMemory = Memory(sharedMemSize)
         self.instMemory = Memory(instMemSize)
         self.directory = Directorio(cacheSize)
@@ -16,13 +17,17 @@ class Processor():
         self.context = Queue()
         self.finished = []
         self.id = procId
-        self.cores = [Nucleo(i, 'Thread {}'.format(i), InstrCache(cacheSize), DataCache(cacheSize), self.instMemory, self.sharedMemory, trapFlag, self.directory, self.dirLock, self.cacheLock, self.busLock, 512-(256*coreAmount), self) for i in range(coreAmount)]
+        self.sendQueue = sendQ
+        self.receiveQueue = receiveQ
+        self.end = False
+        self.cores = [Nucleo(i, 'Thread {}'.format(i), InstrCache(cacheSize), DataCache(cacheSize), self.instMemory, self.sharedMemory, trapFlag, self.directory, self.dirLock, self.cacheLock, self.busLock, 512-(256*coreAmount), self, self.sendQueue) for i in range(coreAmount)]
     def run(self):
         #aqui se corren las weas lel
-        for core in self.cores:
-            core.start()
-        for core in self.cores:
-            core.join()
+        #mientras los hilos no acaben, trate de leer de la cola
+        #cuando termina el ultio hilo, cambiar a True
+        while not self.end:
+            if self.receiveQueue.empty():
+                msg = self.receiveQueue.get()
         
     def writeContext(self, pc, idThread, registers = None, status = False):
         if not (registers):

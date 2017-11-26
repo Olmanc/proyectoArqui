@@ -2,7 +2,7 @@ import Bloque
 class Directorio:
     #Directory: Array(Dictionary)
     def __init__(self, size):
-        self.directory = [{'block': Bloque.Bloque(), 'state': 'U', 'flags':0}for i in range(size)]
+        self.directory = [{'block': Bloque.Bloque(), 'state': 'U', 'flags':[False]*3}for i in range(size)]
         pass
 
     def isBlocked(self):
