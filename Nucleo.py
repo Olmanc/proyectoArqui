@@ -32,19 +32,23 @@ class Nucleo(Thread):
     
     def setNeighborProcessors(self, processors):
         self.neighborProcessors = processors
-
+    
+    #inicializa los hilos de cada nucleo
     def run(self):
         print("Starting " + self.name + '\n')
         self.isRunning = True
         while(self.isRunning):
             self.execute()
 
+    #incrementa el pc del nucleo
     def incPC(self):
         self.pc += 4
-
+    
+    #devuelve el pc actual del nucleo
     def getPC(self):
         return self.pc
-
+    
+    #asigna un valor al pc
     def setPC(self, pc):
         self.pc  = pc
 
@@ -92,107 +96,147 @@ class Nucleo(Thread):
     def getRegisters(self):
         return self.registers
 
+    #suma el valor de un registro con un valor inmediato
     def daddi(self, sr, dr, imm):
         self.registers[dr] = self.registers[sr] + imm
-
+    
+    #sumar los valores de 2 registros
     def dadd(self, sr, tr, dr):
         self.registers[dr] = self.registers[sr] + self.registers[tr]
-
+    
+    #resta los valores de 2 registros
     def dsub(self, sr, tr, dr):
         self.registers[dr] = self.registers[sr] - self.registers[tr]
 
+    #multiplica los valores de 2 registros
     def dmul(self, sr, tr, dr):
         self.registers[dr] = int(self.registers[sr] * self.registers[tr])
 
+    #divideresta los valores de 2 registros
     def ddiv(self, sr, tr, dr):
         self.registers[dr] = int(self.registers[sr] / self.registers[tr])
-
+    
+    #compara si el valor de un registro es igual a 0
     def beqz(self, sr, tr, imm):
         if(self.registers[sr] == 0):
             self.pc += imm * 4
-
+        
+    #compara si el valor de un registro es igual a 0
     def bneqz(self, sr, tr, imm):
         if not (self.registers[sr] == 0):
             self.pc += imm * 4
 
+    #
     def jal(self, sr, tr, imm):
         self.registers[31] = self.pc
         self.pc += imm
 
     def jr(self, sr, tr, imm):
         self.pc = self.registers[sr]
-
-    def lw(self, sr, dr, imm):        
+    
+    #carga un dato d memoria a registro
+    def lw(self, sr, dr, imm):
+        #calcula bloque, palabra y espacio en cache
         addr = self.registers[sr]+imm
         block = (addr//16)
         cacheSpace = block%4
         word = (addr-(block*16))//4
-        #print('Load addr {0} block {1} word {2} on {3}'.format(self.registers[sr]+imm, block, word, self.id))
         finish = False
         while not finish:
+            #intenta bloquear cache
             if self.cacheLock.acquire(False):
                 hit = self.dataCache.findBlock(addr)
-                if hit: #esta en cache C o M
+                # es hit (esta en cache)
+                if hit:
+                    #carga dato al registro
                     rBlock = self.sharedMemory.read(addr)
                     self.registers[dr] = rBlock.getWord(word)
                     finish = True
+                    #libera cache
                     self.cacheLock.release()
                 else:
-                    #miss, bloque victima                    
+                    #miss, bloque victima
+                    #intenta bloquear directorio           
                     if self.dirLock.acquire(False):
                         self.cicles += 1
+                        #bloque victima
                         victim = self.dataCache.cache[cacheSpace]
+                        #victima con estado M
                         if victim['state'] == 'M':
+                            #intenta bloquear bus
                             if self.busLock.acquire(False):
-                                #write to memory
+                                #escribe bloque victima a memoria
                                 self.sharedMemory.writeBlock(victim['block'],victim['tag']*16)
+                                #actualiza directorio y cache
                                 self.directory.directory[victim['tag']]['state'] = 'U'
                                 self.directory.directory[victim['tag']]['flags'][int(self.name)] = True
-                                self.dataCache.cache[cacheSpace]['state'] = 'I'                              
+                                self.dataCache.cache[cacheSpace]['state'] = 'I'
+                                #libera el bus                    
                                 self.busLock.release()
                             else:
+                                #no pudo bloquear bus, libera recursos
+                                self.dirLock.release()
                                 self.cacheLock.release()
                                 continue #cambio de ciclo
+                        #bloque en directorio es U o C
                         if self.directory.directory[word]['state'] == 'U' or 'C':
-                            if self.busLock.acquire(False):                                
-                                self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.read(addr)                                
+                            #intenta bloquear bus
+                            if self.busLock.acquire(False):
+                                #carga bloque de mamoria a cache           
+                                self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.read(addr) 
+                                #libera el bus                               
                                 self.busLock.release()
+                                #actualiza directorio y cache
                                 self.directory.directory[block]['state'] = 'C'
                                 self.directory.directory[block]['flags'][int(self.name)] = True
                                 self.dataCache.cache[cacheSpace]['state'] = 'C'
                                 self.dataCache.cache[cacheSpace]['tag'] = int(block)
+                                #libera directorio
                                 self.dirLock.release()
+                                #carga dato a registro
                                 self.registers[dr] = self.dataCache.cache[cacheSpace]['block'].getWord(word)
+                                #libera cache
                                 self.cacheLock.release()
                                 self.cicles += 16
                                 finish = True
                             else:
+                                #no pudo bloquear bus, libera recursos
                                 self.dirLock.release()
                                 self.cacheLock.release()
                                 continue #cambio de ciclo
+                        #bloque es M
                         elif self.directory.directory[block]['state'] == 'M':
+                            #intenta bloquear bus
                             if self.busLock.acquire():
-                                #write to memory
+                                #escribe bloque a cache
                                 self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.read(addr)
+                                #libera bus
                                 self.busLock.release()
+                                #actualiza directorio y cache
                                 self.directory.directory[block]['state'] = 'C'
                                 self.directory.directory[block]['flags'][int(self.name)] = True
                                 self.dataCache.cache[cacheSpace]['state'] = 'C'
                                 self.dataCache.cache[cacheSpace]['tag'] = int(block)
+                                #libera directorio
                                 self.dirLock.release()
+                                #carga dato a registro
                                 self.registers[dr] = self.dataCache.cache[cacheSpace]['block'].getWord(word)
+                                #libera cache
                                 self.cacheLock.release()
                                 finish = True
                             else:
+                                #no pudo bloquear bus, libera recursos
                                 self.dirLock.release()
                                 self.cacheLock.release()
                                 self.cicles += 1
                                 continue #cambio de ciclo
                     else:
+                        #no pudo bloquear directorio, libera cache
                         self.cacheLock.release()
                         self.cicles += 1
                         continue #cambio de ciclo
             else:
+                #no pudo bloquear cache, cambia de ciclo
                 self.cicles += 1
                 continue #cambio de ciclo
         #'''

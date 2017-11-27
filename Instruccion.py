@@ -3,6 +3,7 @@ class Intruccion:
     #RegDest: int
     #RegSource: int
     #RegToImm: int
+    #clade Instruccion
     def __init__(self, code, regSour1, regTOrImm, regDest):
         self.OpCode = code
         self.RegSource = regSour1

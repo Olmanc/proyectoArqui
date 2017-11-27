@@ -1,6 +1,6 @@
 
 class Directorio:
-    #Directory: Array(Dictionary)
+    #Directorio con los estado de los bloques en memoria
     def __init__(self, size, cores):
         self.coreAmount = cores
         self.directory = [{'block': i, 'state': 'U', 'flags':[False]*3} for i in range(size)]
