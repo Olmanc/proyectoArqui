@@ -8,3 +8,6 @@ class Bloque:
 
     def setWord(self, position, inst):
         self.block[position] = inst
+    def copy(self, other):
+        for i in range(4):
+            self.block[i] = other.block[i]

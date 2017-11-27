@@ -1,7 +1,7 @@
 from Bloque import Bloque
 class Memory():
     def __init__(self, size):
-        self.memory = [Bloque(1) for i in range(size)]
+        self.memory = [Bloque(0) for i in range(size)]
     def write(self, block, word, data):
         self.memory[block].setWord(word, data)
     def writeBlock(self, block, addressInBytes):
