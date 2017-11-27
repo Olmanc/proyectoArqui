@@ -14,3 +14,15 @@ class DataCache:
             if (block['tag'] == blockNum):
                 return True
         return False
+
+    def getBlock(self, address):
+        memBlock = int(address / 16)
+        word = int(address % 16 / 4)
+        cacheBlock = memBlock % 4
+        return self.cache[cacheBlock]['block']
+
+    def setBlock(self, address, block):
+        memBlock = int(address / 16)
+        word = int(address % 16 / 4)
+        cacheBlock = memBlock % 4
+        self.cache[cacheBlock]['block'] = block

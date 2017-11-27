@@ -28,6 +28,9 @@ class Nucleo(Thread):
         self.currentContext = None
         self.cicles = 0
         self.sendQueue = sendQ
+    
+    def setNeighborProcessors(self, processors):
+        self.neighborProcessors = processors
 
     def run(self):
         print("Starting " + self.name + '\n')
@@ -199,8 +202,10 @@ class Nucleo(Thread):
     def sw(self, sr, dr, imm):
         #calcular mem y buscar
         addr = self.registers[sr]+imm-self.memStart
-        block = addr//16
-        word = (addr-(block*16))//4
+        block = int(address / 16)
+        word = int(address % 16 / 4)
+        cacheBlock = memBlock % 4
+
         finish = False
         '''
         SW Rx, n(Ry)  =  Rx <-- M(n+Ry)
@@ -212,47 +217,81 @@ class Nucleo(Thread):
         self.cacheLock = cacheLock
         self.busLock = busLock
         '''
-        #while not finish:
-        #    if self.cacheLock.acquire(False):
+        while not finish:
+            if self.cacheLock.acquire(False):
+                hit = self.dataCache.findBlock(addr)
+                # esto deberia ser el propio o el remoto si el directorio casa es remoto
+                if self.dirLock.acquire(False):
+                    if(hit):
+                        victim = self.dataCache.cache[word]
+                        if victim['state'] == 'I':
+                            print('fetch de algun lugar')
+                        else:
+                            print('invalidando en otras caches')
+                            #usar metorodo de directory.updateStatus(block, core, flag)
+                            finish = True
+                            self.dirLock.release()
+                            self.cacheLock.release()
+                            self.dataCache.write(addr, registers[dr])
+                    else:
+                        print('revisando en caches remotas')
+                        isCached = self.parentProcessor.directory.getBlockStatus(block)
+                        if (isCached == 'C'):
+                            coreOwner = self.parentProcessor.directory.getCoreOwner(block)
+                            if(coreOwner < 2):
+                                self.dataCache.setBlock(addr, self.parentProcessor.cores[coreOwner].dataCache.read(addr))
+                                self.parentProcessor.cores[coreOwner].dataCache[cacheBlock]['state'] = 'I'
+                                self.parentProcessor.directory.updateStatus(0, coreOwner)
+                                self.neighborProcessors.directory.updateStatus(0, coreOwner)
+                            else:
+                                self.dataCache.setBlock(addr, self.neighborProcessors.cores[coreOwner].dataCache.read(addr))
+                                self.neighborProcessors.cores[coreOwner].dataCache[cacheBlock]['state'] = 'I'
+                                self.parentProcessor.directory.updateStatus(0, coreOwner)
+                                self.neighborProcessors.directory.updateStatus(0, coreOwner)
+                            self.dirLock.release()
+                            self.cacheLock.release()
+                            self.dataCache.write(addr, registers[dr])
+                        else:
+                            print('traer de memoria')
         #        hit = self.dataCache.findBlock(addr)
         #        if hit: #esta en cache
         #            finish = True                    
-                    # si es M
+        #             si es M
         #            print(self.dataCache.cache)
         #            continue
-                    #if self.dataCache.cache[word]
-                    #else si es C
-                        #bloquear directorio
-                        #invalidar en otras caches (bloquear cache remota? o usar cola?)
-                        #escribir en cache local
-                        #marcar como M en cache Y directorio
-                        #actualiza cache y directorio
-                        #desbloquear candados
-                #else: no esta en cache (miss)
-                    #bloquear directorio
-                    #bloque victima (copira a memoria)
-                    #invalidar y actualizar directorio
-                    #si es U
-                        #bloquear bus
-                        #cargar de memoria
-                        #cargar en cache
-                        #escribe en cache
-                        #marcar como M
-                        #desbloquear candados
-                    #else si es M****
-                        #donde esta el bloque?
-                        #copiar a memoria
-                        #copiar a cache
-                        #escribe en cache
-                        #(se mantiene M)
-                        #desbloquear canados
-                    #else si es C
-                        #invalidar en otras caches
-                        #traer de memoria
-                        #carga en cache
-                        #escribe en cache
-                        #marca como M
-                        #desbloquear canados
+        #             if self.dataCache.cache[word]
+        #             else si es C
+        #                 bloquear directorio
+        #                 invalidar en otras caches (bloquear cache remota? o usar cola?)
+        #                 escribir en cache local
+        #                 marcar como M en cache Y directorio
+        #                 actualiza cache y directorio
+        #                 desbloquear candados
+        #         else: no esta en cache (miss)
+        #             bloquear directorio
+        #             bloque victima (copira a memoria)
+        #             invalidar y actualizar directorio
+        #             si es U
+        #                 bloquear bus
+        #                 cargar de memoria
+        #                 cargar en cache
+        #                 escribe en cache
+        #                 marcar como M
+        #                 desbloquear candados
+        #             else si es M****
+        #                 donde esta el bloque?
+        #                 copiar a memoria
+        #                 copiar a cache
+        #                 escribe en cache
+        #                 (se mantiene M)
+        #                 desbloquear canados
+        #             else si es C
+        #                 invalidar en otras caches
+        #                 traer de memoria
+        #                 carga en cache
+        #                 escribe en cache
+        #                 marca como M
+        #                 desbloquear canados
         #    else:
         #        finish = True 
 

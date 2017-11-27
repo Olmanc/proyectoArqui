@@ -42,6 +42,9 @@ def main():
     for proc in procs:
         for core in proc.cores:
             cores.append(core)
+    cores[0].setNeighborProcessors(p2)
+    cores[1].setNeighborProcessors(p2)
+    cores[2].setNeighborProcessors(p1)
     for core in cores:
         core.start()
     for core in cores:
