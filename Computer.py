@@ -7,11 +7,19 @@ barrier = Barrier(2)
 
 #recibe nombre de la carpeta donde esta los hilos
 #y el procesador donde carga la instrucciones
+def getPosiblesHilos(computerDir):
+    a = glob.glob('./'+ computerDir +'/*.txt')
+    threads = {}
+    i = 1
+    for x in a:
+        threads[i] = x
+        i += 1
+    return threads
 def getHilos(dir, procesador):
-    a = glob.glob('./'+ dir +'/*.txt')
+    #a = glob.glob('./'+ dir +'/*.txt')
     l = (len(procesador.instMemory.memory)*4)
     cont = 0
-    for x in a:
+    for x in dir:
         fo = open(x,"r")
         procesador.writeContext(cont*4, x)
         for line in fo.readlines():
@@ -43,13 +51,20 @@ def formatCacheForOutput(cache, ppCache = []):
 def main():
     quantum = int(input("Digite el quantum: \n"))
     OS.opSystem.setQuantum(quantum)
-    #print(OS.opSystem.getQuantum())
+    print('Set quantum to {}\n'.format(OS.opSystem.getQuantum()))
+    p1PHilos = getPosiblesHilos('p0')
+    p2PHilos= getPosiblesHilos('p1')
+    hilosP1 = [int(i) for i in input('Digite el id (numero) de los hilos que desea ejecutar para procesador 0, separados por un espacio.\nHilos: {}\n'.format(p1PHilos)).strip().split()]
+    dir1 = [p1PHilos[i] for i in hilosP1]
+    hilosP2 = [int(i) for i in input('Digite el id (numero) de los hilos que desea ejecutar para procesador 0, separados por un espacio.\nHilos: {}\n'.format(p2PHilos)).strip().split()]
+    dir2 = [p2PHilos[i] for i in hilosP2]
     p1 = Processor.Processor(2, 24, 24, 4, 0, 0)
     p2 = Processor.Processor(1, 16, 24, 4, 0, 1)
-    dir1 = 'p0'
-    dir2 = 'p1'
     getHilos(dir1, p1)
     getHilos(dir2, p2)
+    
+    # getHilos(dir1, p1)
+    # getHilos(dir2, p2)
     procs = [p1, p2]
     #procs = [p2]
     cores = []
