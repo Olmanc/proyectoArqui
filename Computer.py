@@ -27,12 +27,25 @@ def getHilos(dir, procesador):
             cont += 1
 #prueba crear un procesador y  palabras de memoria de instrucciones metidas a memoria
 
+def formatSharedMemForOutput(sharedMem, ppSharedMem = {}):
+    for i in range(len(sharedMem)):
+        ppSharedMem[i] = sharedMem[i].block
+    return ppSharedMem
+
+def formatCacheForOutput(cache, ppCache = []):
+    for i in cache.cache:
+        ppCacheBlock = {}
+        ppCacheBlock['block'] = i['block'].block
+        ppCacheBlock['state'] = i['state']
+        ppCacheBlock['tag'] = i['tag']
+        ppCache.append(ppCacheBlock)
+    return ppCache
 def main():
     quantum = int(input("Digite el quantum: \n"))
     OS.opSystem.setQuantum(quantum)
     #print(OS.opSystem.getQuantum())
-    p1 = Processor.Processor(2, 24, 16, 4, 0, 0)
-    p2 = Processor.Processor(1, 24, 16, 4, 0, 1)
+    p1 = Processor.Processor(2, 24, 24, 4, 0, 0)
+    p2 = Processor.Processor(1, 16, 24, 4, 0, 1)
     dir1 = 'p3'
     dir2 = 'p4'
     getHilos(dir1, p1)
@@ -58,7 +71,18 @@ def main():
     print('Gathering contexts for printing...')
     print('Formatting registers for output...')
     print('Done!\n')
+
+    ppSharedMem = formatSharedMemForOutput(p1.sharedMemory.memory)
+    print('SharedMem: {} \n'.format(ppSharedMem))
+    ppCacheCore0P0 = formatCacheForOutput(p1.cores[0].dataCache)
+    ppCacheCore1P0 = formatCacheForOutput(p1.cores[1].dataCache)
+    ppCacheCore0P1 = formatCacheForOutput(p2.cores[0].dataCache)
+    print('Data Cache for Core 0 in P0: {}\n'.format(ppCacheCore0P0))
+    print('Data Cache for Core 1 in P0: {}\n'.format(ppCacheCore1P0))
+    print('Data Cache for Core 0 in P1: {}\n'.format(ppCacheCore0P1))
+    print('Directory: {}\n'.format(p1.directory.directory))
     for proc in procs:
+        
         for context in proc.finished:
             
             registers = context['registers']

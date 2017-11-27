@@ -3,7 +3,7 @@ class Directorio:
     #Directory: Array(Dictionary)
     def __init__(self, size, cores):
         self.coreAmount = cores
-        self.directory = [{'block': i, 'state': 'U', 'flags':[False]*cores} for i in range(size)]
+        self.directory = [{'block': i, 'state': 'U', 'flags':[False]*3} for i in range(size)]
 
     def isHome(self):
         pass

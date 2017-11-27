@@ -159,7 +159,6 @@ class Nucleo(Thread):
                             if self.busLock.acquire(False):                                
                                 self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)                                
                                 self.busLock.release()
-                                print(block)
                                 self.directory.directory[block]['state'] = 'C'
                                 self.directory.directory[block]['flags'][int(self.name)] = True
                                 self.dataCache.cache[word]['state'] = 'C'
