@@ -4,6 +4,7 @@ import OS as OpSystem
 import Instruccion
 import queue 
 import time
+import Bloque
 class Nucleo(Thread):
     def __init__(self, name, idCore, instrCache, dataCache, instMem, sharedMemory, trapFlag, directory, dirLock, cacheLock, busLock, start, parentProcessor, sendQ):
         self.pc = 0
@@ -121,50 +122,47 @@ class Nucleo(Thread):
     def jr(self, sr, tr, imm):
         self.pc = self.registers[sr]
 
-    def lw(self, sr, dr, imm):
-                
-        addr = self.registers[sr]+imm-self.memStart
-        #print('ADDR: ',self.registers[sr]+imm, ' en ', self.name, self.id)
-        #print(addr)
-        block = (addr//16)%16
-        #word = (addr-(block*16))//4
-        word = addr % 4
-        #print('Load addr {0} block {1} word {2}'.format(addr, block, word))
+    def lw(self, sr, dr, imm):        
+        addr = self.registers[sr]+imm
+        block = (addr//16)
+        cacheSpace = block%4
+        word = (addr-(block*16))//4
+        #print('Load addr {0} block {1} word {2} on {3}'.format(self.registers[sr]+imm, block, word, self.id))
         finish = False
         while not finish:
             if self.cacheLock.acquire(False):
                 hit = self.dataCache.findBlock(addr)
                 if hit: #esta en cache C o M
                     rBlock = self.sharedMemory.read(addr)
-                    self.registers[dr] = rBlock.block[word]
+                    self.registers[dr] = rBlock.getWord(word)
                     finish = True
                     self.cacheLock.release()
                 else:
                     #miss, bloque victima                    
                     if self.dirLock.acquire(False):
                         self.cicles += 1
-                        victim = self.dataCache.cache[word]
+                        victim = self.dataCache.cache[cacheSpace]
                         if victim['state'] == 'M':
                             if self.busLock.acquire(False):
                                 #write to memory
-                                self.sharedMemory.writeBlock(victim['block'],victim['tag'])
+                                self.sharedMemory.writeBlock(victim['block'],victim['tag']*16)
                                 self.directory.directory[victim['tag']]['state'] = 'U'
-                                self.directory.directory[victim['tag']]['flags'][self.id] = True
-                                self.dataCache.cache[word]['state'] = 'I'                              
+                                self.directory.directory[victim['tag']]['flags'][int(self.name)] = True
+                                self.dataCache.cache[cacheSpace]['state'] = 'I'                              
                                 self.busLock.release()
                             else:
                                 self.cacheLock.release()
                                 continue #cambio de ciclo
                         if self.directory.directory[word]['state'] == 'U' or 'C':
                             if self.busLock.acquire(False):                                
-                                self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)                                
+                                self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.read(addr)                                
                                 self.busLock.release()
                                 self.directory.directory[block]['state'] = 'C'
                                 self.directory.directory[block]['flags'][int(self.name)] = True
-                                self.dataCache.cache[word]['state'] = 'C'
-                                self.dataCache.cache[word]['tag'] = int(block)
+                                self.dataCache.cache[cacheSpace]['state'] = 'C'
+                                self.dataCache.cache[cacheSpace]['tag'] = int(block)
                                 self.dirLock.release()
-                                self.registers[dr] = self.dataCache.cache[word]['block'].block[word]
+                                self.registers[dr] = self.dataCache.cache[cacheSpace]['block'].getWord(word)
                                 self.cacheLock.release()
                                 self.cicles += 16
                                 finish = True
@@ -175,13 +173,14 @@ class Nucleo(Thread):
                         elif self.directory.directory[block]['state'] == 'M':
                             if self.busLock.acquire():
                                 #write to memory
-                                self.dataCache.cache[word]['block'] = self.sharedMemory.read(addr)
+                                self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.read(addr)
                                 self.busLock.release()
                                 self.directory.directory[block]['state'] = 'C'
                                 self.directory.directory[block]['flags'][int(self.name)] = True
-                                self.dataCache.cache[word]['state'] = 'C'
+                                self.dataCache.cache[cacheSpace]['state'] = 'C'
+                                self.dataCache.cache[cacheSpace]['tag'] = int(block)
                                 self.dirLock.release()
-                                self.registers[dr] = self.dataCache.cache[word]['block'].block[word]
+                                self.registers[dr] = self.dataCache.cache[cacheSpace]['block'].getWord(word)
                                 self.cacheLock.release()
                                 finish = True
                             else:
@@ -199,100 +198,170 @@ class Nucleo(Thread):
         #'''
         
     def sw(self, sr, dr, imm):
-        #calcular mem y buscar
-        addr = self.registers[sr]+imm-self.memStart
-        block = int(address / 16)
-        word = int(address % 16 / 4)
-        cacheBlock = memBlock % 4
-
+        #calcula bloque, palabra y espacio de cache     
+        addr = self.registers[sr]+imm
+        block = (addr//16)
+        cacheSpace = block%4
+        word = (addr-(block*16))//4
         finish = False
-        '''
-        SW Rx, n(Ry)  =  Rx <-- M(n+Ry)
-        SW 43 16 2 0        M[R16] = 2
-        SW 43 16 2 4        M[R16] = 2
-        SW 43 16 2 8        M[R16] = 2
-
-        self.dirLock = dirLock
-        self.cacheLock = cacheLock
-        self.busLock = busLock
-        '''
         while not finish:
+            #bloquear cache
             if self.cacheLock.acquire(False):
                 hit = self.dataCache.findBlock(addr)
-                # esto deberia ser el propio o el remoto si el directorio casa es remoto
-                if self.dirLock.acquire(False):
-                    if(hit):
-                        victim = self.dataCache.cache[word]
-                        if victim['state'] == 'I':
-                            print('fetch de algun lugar')
-                        else:
-                            print('invalidando en otras caches')
-                            #usar metorodo de directory.updateStatus(block, core, flag)
+                if hit: #esta en cache              
+                    # si es M
+                    if self.dataCache.cache[cacheSpace]['state'] == 'M':                        
+                        self.dataCache.cache[cacheSpace]['block'].setWord(word,self.registers[dr])
+                        self.cacheLock.release()
+                        finish = True
+                        self.cicles += 1
+                        continue
+                    #si es C
+                    elif self.dataCache.cache[cacheSpace]['state'] == 'C':
+                        #bloquear directorio
+                        if self.dirLock.acquire(False):
+                            #invalidar en otras caches (bloquear cache remota? o usar cola?)                                           
+                            '''self.neighborProcessors.invalidateCache(block)
+                            self.parentProcessor.invalidateCache(block)'''
+                            #escribir en cache local
+                            self.dataCache.cache[cacheSpace]['block'] = Bloque.Bloque(0)
+                            for i in range(4):
+                                self.dataCache.cache[cacheSpace]['block'].block[i] = self.sharedMemory.memory[self.dataCache.cache[cacheSpace]['tag']].getWord(i)
+                            #self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.memory[self.dataCache.cache[cacheSpace]['tag']]
+                            self.dataCache.cache[cacheSpace]['block'].setWord(word, self.registers[dr])
+                            #marcar como M en cache Y directorio
+                            #actualiza cache y directorio
+                            self.dataCache.cache[cacheSpace]['state'] = 'M'
+                            self.directory.directory[block]['state'] = 'M'
+                            #desbloquear candados
+                            self.dirLock.release()
+                            self.cacheLock.release()
                             finish = True
-                            self.dirLock.release()
-                            self.cacheLock.release()
-                            self.dataCache.write(addr, registers[dr])
-                    else:
-                        print('revisando en caches remotas')
-                        isCached = self.parentProcessor.directory.getBlockStatus(block)
-                        if (isCached == 'C'):
-                            coreOwner = self.parentProcessor.directory.getCoreOwner(block)
-                            if(coreOwner < 2):
-                                self.dataCache.setBlock(addr, self.parentProcessor.cores[coreOwner].dataCache.read(addr))
-                                self.parentProcessor.cores[coreOwner].dataCache[cacheBlock]['state'] = 'I'
-                                self.parentProcessor.directory.updateStatus(0, coreOwner)
-                                self.neighborProcessors.directory.updateStatus(0, coreOwner)
-                            else:
-                                self.dataCache.setBlock(addr, self.neighborProcessors.cores[coreOwner].dataCache.read(addr))
-                                self.neighborProcessors.cores[coreOwner].dataCache[cacheBlock]['state'] = 'I'
-                                self.parentProcessor.directory.updateStatus(0, coreOwner)
-                                self.neighborProcessors.directory.updateStatus(0, coreOwner)
-                            self.dirLock.release()
-                            self.cacheLock.release()
-                            self.dataCache.write(addr, registers[dr])
+                            self.cicles += 16
+                            continue
                         else:
-                            print('traer de memoria')
-        #        hit = self.dataCache.findBlock(addr)
-        #        if hit: #esta en cache
-        #            finish = True                    
-        #             si es M
-        #            print(self.dataCache.cache)
-        #            continue
-        #             if self.dataCache.cache[word]
-        #             else si es C
-        #                 bloquear directorio
-        #                 invalidar en otras caches (bloquear cache remota? o usar cola?)
-        #                 escribir en cache local
-        #                 marcar como M en cache Y directorio
-        #                 actualiza cache y directorio
-        #                 desbloquear candados
-        #         else: no esta en cache (miss)
-        #             bloquear directorio
-        #             bloque victima (copira a memoria)
-        #             invalidar y actualizar directorio
-        #             si es U
-        #                 bloquear bus
-        #                 cargar de memoria
-        #                 cargar en cache
-        #                 escribe en cache
-        #                 marcar como M
-        #                 desbloquear candados
-        #             else si es M****
-        #                 donde esta el bloque?
-        #                 copiar a memoria
-        #                 copiar a cache
-        #                 escribe en cache
-        #                 (se mantiene M)
-        #                 desbloquear canados
-        #             else si es C
-        #                 invalidar en otras caches
-        #                 traer de memoria
-        #                 carga en cache
-        #                 escribe en cache
-        #                 marca como M
-        #                 desbloquear canados
-        #    else:
-        #        finish = True 
+                            #no pudo bloquear directorio, libera cache
+                            self.cacheLock.release()
+                            self.cicles += 1
+                            continue
+                else: #no esta en cache (miss)
+                    #bloquear directorio
+                    if self.dirLock.acquire(False):
+                        #bloque victima (copiar a memoria)
+                        victim = self.dataCache.cache[cacheSpace]
+                        self.sharedMemory.memory[victim['tag']] = victim['block']                        
+                        #invalidar y actualizar directorio
+                        self.directory.directory[block]['state'] = 'U'
+                        self.directory.directory[block]['flags'][int(self.name)] = False
+                        #si es U
+                        if self.directory.directory[block]['state'] == 'U':
+                            #bloquear bus
+                            if self.busLock.acquire(False):
+                                #cargar en cache de memoria
+                                self.dataCache.cache[cacheSpace]['block'] = Bloque.Bloque(0)
+                                for i in range(4):
+                                    self.dataCache.cache[cacheSpace]['block'].block[i] = self.sharedMemory.memory[block].getWord(i)
+                                #self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.memory[block]
+                                #escribe en cache
+                                self.dataCache.cache[cacheSpace]['block'].setWord(word, self.registers[dr])
+                                #marcar como M
+                                self.dataCache.cache[cacheSpace]['state'] = 'M'
+                                self.dataCache.cache[cacheSpace]['tag'] = int(block)
+                                self.directory.directory[block]['state'] = 'M'
+                                self.directory.directory[block]['flags'][int(self.name)] = True
+                                #desbloquear candados
+                                self.busLock.release()
+                                self.dirLock.release()
+                                self.cacheLock.release()
+                                finish = True
+                                self.cicles += 16
+                                continue
+                            else:
+                                #no pudo bloquear bus, libera recursos
+                                self.dirLock.release()
+                                self.cacheLock.release()
+                                self.cicles += 1
+                                continue
+                        #else si es M
+                        elif self.directory.directory[block]['state'] == 'M':
+                            if busLock.acquire(False):                                
+                                #donde esta el bloque?
+                                flag = self.directory.directory[block]['flags']
+                                #esta en cache local
+                                if flag[int(self.name)] == True:
+                                    #copiar a cache de memoria
+                                    self.dataCache.cache[cacheSpace]['block'] = Bloque.Bloque(0)
+                                    for i in range(4):
+                                        self.dataCache.cache[cacheSpace]['block'].block[i] = self.sharedMemory.memory[block].getWord(i)
+                                    #self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.memory[block]
+                                    #escribe en cache
+                                    self.dataCache.cache[cacheSpace]['block'].setWord(word, self.registers[dr])
+                                    #(se mantiene M) actualiza cache
+                                    self.dataCache.cache[cacheSpace]['state'] = 'M'
+                                    self.dataCache.cache[cacheSpace]['tag'] = int(block)
+                                    #desbloquear canados
+                                    self.busLock.release()
+                                    self.dirLock.release()
+                                    self.cacheLock.release()
+                                    finish = True
+                                    self.cicles += 16
+                                    continue
+                                #esta en cache remota
+                                else:
+                                    self.cicles += 40
+                                    pass
+                            else:
+                                #no pudo bloquear bus, libera recursos
+                                self.dirLock.release()
+                                self.cacheLock.release()
+                                self.cicles += 1
+                                continue
+                        #else si es C
+                        elif self.directory.directory[block]['state'] == 'C':
+                            if busLock.acquire(False):
+                                #invalidar en otras caches
+                                '''self.neighborProcessors.invalidateCache(block)
+                                self.parentProcessor.invalidateCache(block)'''
+                                #carga en cache de memoria
+                                self.dataCache.cache[cacheSpace]['block'] = Bloque.Bloque(0)
+                                for i in range(4):
+                                    self.dataCache.cache[cacheSpace]['block'].block[i] = self.sharedMemory.memory[block].getWord(i)
+                                #self.dataCache.cache[cacheSpace]['block'] = self.sharedMemory.memory[block]
+                                #escribe en cache
+                                self.dataCache.cache[cacheSpace]['block'].setWord(word, dr)
+                                #marca como M
+                                self.dataCache.cache[cacheSpace]['state'] = 'M'
+                                self.dataCache.cache[cacheSpace]['tag'] = int(block)
+                                self.directory.directory[block]['state'] = 'M'
+                                self.directory.directory[block]['flags'][int(self.name)] = True
+                                #desbloquear candados
+                                self.busLock.release()
+                                self.dirLock.release()
+                                self.cacheLock.release()
+                                finish = True
+                                continue
+                            else:
+                                #el bloque no es U, C o M (no pasa)
+                                self.dirLock.release()
+                                self.cacheLock.release()
+                                self.cicles += 1
+                                continue
+                        else:
+                            #no pudo bloquear bus, libera recursos
+                            self.dirLock.release()
+                            self.cacheLock.release()
+                            self.cicles += 1
+                            continue
+                    else:
+                        #no pudo bloquear directorio, libera cache
+                        self.cacheLock.release()
+                        self.cicles +=1
+                        continue
+            else:
+                #no pudo bloquear cache, cambia de ciclo
+                self.cicles += 1
+                continue
+
 
     def loadContext(self):
 

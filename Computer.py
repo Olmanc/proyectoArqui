@@ -46,11 +46,12 @@ def main():
     #print(OS.opSystem.getQuantum())
     p1 = Processor.Processor(2, 24, 24, 4, 0, 0)
     p2 = Processor.Processor(1, 16, 24, 4, 0, 1)
-    dir1 = 'p3'
-    dir2 = 'p4'
+    dir1 = 'p0'
+    dir2 = 'p1'
     getHilos(dir1, p1)
     getHilos(dir2, p2)
     procs = [p1, p2]
+    #procs = [p2]
     cores = []
     for proc in procs:
         for core in proc.cores:
